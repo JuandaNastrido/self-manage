@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model UserPreferences {
+  id        String   @id @default("default")
+  currency  String   @default("IDR")
+  timezone  String   @default("Asia/Jakarta")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id           String        @id @default(uuid())
+  name         String
+  type         CategoryType
+  color        String?
+  icon         String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  transactions Transaction[]
+  budgets      Budget[]
+
+  @@unique([name, type])
+  @@index([type])
+}
+
+enum CategoryType {
+  INCOME
+  EXPENSE
+}
+
+model Transaction {
+  id                String             @id @default(uuid())
+  amount            Int
+  type              TransactionType
+  categoryId        String
+  category          Category           @relation(fields: [categoryId], references: [id])
+  date              DateTime
+  description       String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  savingsAllocations SavingsAllocation[]
+
+  @@index([type])
+  @@index([date])
+  @@index([categoryId, date])
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  REFUND
+}
+
+model TaskCategory {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tasks     Task[]
+}
+
+model Task {
+  id                   String        @id @default(uuid())
+  title                String
+  description          String?
+  priority             TaskPriority  @default(MEDIUM)
+  status               TaskStatus    @default(TODO)
+  dueDate              DateTime?
+  plannedDurationMinutes Int?
+  taskCategoryId       String?
+  taskCategory         TaskCategory? @relation(fields: [taskCategoryId], references: [id])
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  completedAt          DateTime?
+  timerState           TimerState?
+  timeEntries          TimeEntry[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([dueDate])
+  @@index([taskCategoryId])
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  ARCHIVED
+}
+
+model TimerState {
+  id                 String   @id @default("active")
+  taskId             String?     @unique
+  task               Task?    @relation(fields: [taskId], references: [id])
+  startTime          DateTime
+  pausedAt           DateTime?
+  accumulatedSeconds Int      @default(0)
+  running            Boolean  @default(false)
+
+  @@unique([id])
+}
+
+model TimeEntry {
+  id              String   @id @default(uuid())
+  taskId          String?
+  task            Task?    @relation(fields: [taskId], references: [id])
+  startTime       DateTime
+  endTime         DateTime
+  durationSeconds Int
+  description     String?
+  createdAt       DateTime @default(now())
+
+  @@index([taskId])
+  @@index([startTime, endTime])
+}
+
+model Budget {
+  id        String   @id @default(uuid())
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+  year      Int
+  month     Int
+  amount    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([categoryId, year, month])
+  @@index([year, month])
+}
+
+model SavingsGoal {
+  id            String             @id @default(uuid())
+  name          String
+  description   String?
+  targetAmount  Int
+  targetDate    DateTime?
+  currentAmount Int                @default(0)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  allocations   SavingsAllocation[]
+}
+
+model SavingsAllocation {
+  id            String      @id @default(uuid())
+  savingsGoalId String
+  savingsGoal   SavingsGoal @relation(fields: [savingsGoalId], references: [id])
+  transactionId String?
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+  amount        Int
+  date          DateTime
+  createdAt     DateTime    @default(now())
+
+  @@index([savingsGoalId])
+  @@index([transactionId])
+}
