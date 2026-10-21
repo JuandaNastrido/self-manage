@@ -4,7 +4,7 @@ const path = require("path");
 
 // Check if next/jest is available
 const nextJestAvailable = fs.existsSync(
-  path.join(process.cwd(), "node_modules", "next", "jest")
+  path.join(process.cwd(), "node_modules", "next", "jest.js")
 );
 
 if (!nextJestAvailable) {

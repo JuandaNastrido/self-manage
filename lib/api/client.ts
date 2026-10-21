@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Shared API client for frontend components.
  * Provides typed fetch wrappers for all API endpoints.

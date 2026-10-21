@@ -17,7 +17,7 @@ export const getCategoriesQuerySchema = z.object({
     .enum(["INCOME", "EXPENSE", "REFUND"])
     .optional()
     .nullable()
-    .transform((v) => (v == null || v === "" ? undefined : v as CategoryType | undefined)),
+    .transform((v) => (!v ? undefined : v as CategoryType)),
   search: z.string().optional().nullable(),
 });
 

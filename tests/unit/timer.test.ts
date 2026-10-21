@@ -3,7 +3,7 @@
  * The core principle: elapsed time is always recalculated from stored timestamps,
  * never from an in-memory counter.
  */
-import { TimerService } from "@/lib/services/timer";
+import { TimerService, STALE_TIMER_THRESHOLD_MS } from "@/lib/services/timer";
 
 // Helper to create a mock TimerState compatible with TimerService.calculateElapsed
 interface MockTimerState {
@@ -143,6 +143,6 @@ describe("TimerService.calculateElapsed", () => {
 
 describe("TimerService singleton enforcement", () => {
   it("STALE_TIMER_THRESHOLD_MS is 8 hours", () => {
-    expect(TimerService.STALE_TIMER_THRESHOLD_MS).toBe(8 * 60 * 60 * 1000);
+    expect(STALE_TIMER_THRESHOLD_MS).toBe(8 * 60 * 60 * 1000);
   });
 });

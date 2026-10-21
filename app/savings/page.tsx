@@ -39,7 +39,7 @@ export default function SavingsPage() {
       const goalsRes = await savingsGoalsApi.list();
       const txnsRes = await transactionsApi.list();
       setGoals(goalsRes);
-      setTransactions(txnsRes.transactions || txnsRes);
+      setTransactions(txnsRes);
     } catch (err) {
       setError("Gagal memuat data tabungan");
     } finally {

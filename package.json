@@ -31,14 +31,18 @@
   "devDependencies": {
     "@prisma/client": "^6.19.3",
     "@tailwindcss/turbopack": "^4",
+    "@testing-library/jest-dom": "^7.0.1",
     "@types/jest": "^29.5.14",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
+    "ts-jest": "^29.4.15",
     "typescript": "^5"
   }
 }

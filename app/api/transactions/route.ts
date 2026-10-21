@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError, handleApiError } from "@/lib/utils/api-helpers";
 import { createTransactionSchema, getTransactionsQuerySchema } from "@/lib/validators/transaction";
-import { TransactionType } from "@prisma/client";
+import { Prisma, TransactionType } from "@prisma/client";
 
 export async function GET(request: Request) {
   try {
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
         .filter(Boolean) as TransactionType[];
     }
 
-    const where: any = {};
+    const where: Prisma.TransactionWhereInput = {};
 
     if (typeArray && typeArray.length > 0) {
       where.type = { in: typeArray };

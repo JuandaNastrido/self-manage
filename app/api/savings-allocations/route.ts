@@ -7,8 +7,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const goalId = searchParams.get("goalId");
 
-    const where: Record<string, unknown> = {};
-    if (goalId) (where as any).savingsGoalId = goalId;
+    const where: { savingsGoalId?: string } = {};
+    if (goalId) where.savingsGoalId = goalId;
 
     const allocations = await prisma.savingsAllocation.findMany({
       where,

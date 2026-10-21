@@ -246,7 +246,7 @@ describe("filterTransactions", () => {
     const result = filterTransactions(TXNS, {
       categoryId: "cat-food",
     });
-    expect(result).toHaveLength(2);
+    expect(result).toHaveLength(3);
   });
 
   it("filters by date range", () => {

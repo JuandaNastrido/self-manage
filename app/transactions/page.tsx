@@ -75,7 +75,7 @@ export default function TransactionsPage() {
     }
   };
 
-  const incomeCategories = categories.filter((c) => c.type === "INCOME" || c.type === "REFUND");
+  const incomeCategories = categories.filter((c) => c.type === "INCOME");
   const expenseCategories = categories.filter((c) => c.type === "EXPENSE");
 
   const resetFilters = () => {
@@ -322,7 +322,7 @@ function TransactionFormModal({
       ? categories.filter((c) => c.type === "INCOME")
       : type === TransactionType.EXPENSE
       ? categories.filter((c) => c.type === "EXPENSE")
-      : categories.filter((c) => c.type === "REFUND");
+      : categories
 
   // Auto-select first category if none selected when type changes
   useEffect(() => {

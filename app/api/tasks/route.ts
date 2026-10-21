@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError, handleApiError } from "@/lib/utils/api-helpers";
 import { createTaskSchema, getTasksQuerySchema } from "@/lib/validators/task";
-import { TaskPriority, TaskStatus } from "@prisma/client";
+import { Prisma, TaskPriority, TaskStatus } from "@prisma/client";
 
 export async function GET(request: Request) {
   try {
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
       search: searchParams.get("search"),
     };
 
-    const where: any = {};
+    const where: Prisma.TaskWhereInput = {};
 
     // Handle status filter (could be array or single)
     const statusParam = query.status;

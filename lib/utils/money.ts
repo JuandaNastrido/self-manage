@@ -16,11 +16,34 @@ export const CURRENCY_PRECISION: Record<string, number> = {
 export const DEFAULT_CURRENCY = "IDR";
 export const DEFAULT_LOCALE = "id-ID";
 
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  IDR: "Rp",
+  USD: "US$",
+  EUR: "€",
+  JPY: "¥",
+  GBP: "£",
+};
+
+/**
+ * Format the numeric portion with Indonesian thousand separators (dots)
+ * and "." as decimal separator, regardless of locale.
+ */
+function formatNumberParts(value: number, decimals: number): string {
+  const sign = value < 0 ? "-" : "";
+  const abs = Math.abs(value);
+  const str = abs.toFixed(decimals);
+  const dotIndex = str.indexOf(".");
+  const intPart = dotIndex >= 0 ? str.slice(0, dotIndex) : str;
+  const decPart = dotIndex >= 0 ? str.slice(dotIndex + 1) : "";
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${sign}${grouped}${decimals > 0 ? `.${decPart}` : ""}`;
+}
+
 /**
  * Format an integer minor-unit amount into a display string.
  * @param amount - Integer in minor currency units (e.g. 150000 = Rp150.000 for IDR)
  * @param currency - ISO 4217 currency code
- * @returns Formatted string e.g. "Rp 150.000" or "US$ 150.00"
+ * @returns Formatted string e.g. "Rp150.000" or "US$150.00"
  */
 export function formatCurrency(
   amount: number,
@@ -29,23 +52,8 @@ export function formatCurrency(
   const precision = CURRENCY_PRECISION[currency] ?? 0;
   const displayValue =
     precision === 0 ? amount : amount / Math.pow(10, precision);
-
-  try {
-    return new Intl.NumberFormat(DEFAULT_LOCALE, {
-      style: "currency",
-      currency: currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: precision,
-    }).format(displayValue);
-  } catch {
-    // Fallback if Intl currency formatting fails
-    const formatted = new Intl.NumberFormat(DEFAULT_LOCALE, {
-      style: "decimal",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: precision,
-    }).format(displayValue);
-    return `${currency} ${formatted}`;
-  }
+  const symbol = CURRENCY_SYMBOLS[currency] ?? currency;
+  return `${symbol}${formatNumberParts(displayValue, precision)}`;
 }
 
 /**
@@ -61,11 +69,7 @@ export function formatAmountPlain(
   const precision = CURRENCY_PRECISION[currency] ?? 0;
   const displayValue =
     precision === 0 ? amount : amount / Math.pow(10, precision);
-
-  return new Intl.NumberFormat(DEFAULT_LOCALE, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: precision,
-  }).format(displayValue);
+  return formatNumberParts(displayValue, precision);
 }
 
 /**
@@ -128,7 +132,7 @@ export function formatPercentage(
 ): string {
   if (total === 0) return "0%";
   const ratio = value / total;
-  const clamped = Math.min(1, Math.max(0, ratio));
+  const clamped = Math.max(0, ratio);
   return `${(clamped * 100).toFixed(decimals)}%`;
 }
 

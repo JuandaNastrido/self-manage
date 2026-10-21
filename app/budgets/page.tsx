@@ -319,6 +319,7 @@ function BudgetFormModal({
   ];
 
   // Filter out already-budgeted categories for this month/year (unless editing)
+  const editingBudgetId = editingBudget?.id;
   const availableCategories = editingBudget
     ? categories
     : categories.filter(
@@ -328,7 +329,7 @@ function BudgetFormModal({
               b.categoryId === c.id &&
               b.year === year &&
               b.month === month &&
-              b.id !== editingBudget?.id
+              b.id !== editingBudgetId
           )
       );
 

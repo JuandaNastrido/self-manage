@@ -162,10 +162,18 @@ export class DashboardService {
     let activeTimer = null;
     if (timerState && timerState.running) {
       const elapsed = TimerService.calculateElapsed(timerState);
+      let taskTitle: string | null = null;
+      if (timerState.taskId) {
+        const task = await prisma.task.findUnique({
+          where: { id: timerState.taskId },
+          select: { title: true },
+        });
+        taskTitle = task?.title ?? null;
+      }
       activeTimer = {
         running: true,
         taskId: timerState.taskId,
-        taskTitle: (timerState as any).task?.title ?? null,
+        taskTitle,
         elapsedSeconds: elapsed.elapsedSeconds,
       };
     }
