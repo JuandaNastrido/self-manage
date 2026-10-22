@@ -47,12 +47,25 @@ export async function apiFetch<T>(
 }
 
 /**
+ * Response shape of GET /api/transactions — the list plus the all-time
+ * balance figures computed by the server.
+ */
+export interface TransactionsResponse {
+  transactions: any[];
+  balance: number;
+  totalIncome: number;
+  totalExpenses: number;
+}
+
+/**
  * API client for transactions
  */
 export const transactionsApi = {
   list: (params?: URLSearchParams) => {
     const qs = params?.toString();
-    return apiFetch<any[]>(`/api/transactions${qs ? `?${qs}` : ""}`);
+    return apiFetch<TransactionsResponse>(
+      `/api/transactions${qs ? `?${qs}` : ""}`
+    );
   },
 
   get: (id: string) => apiFetch<any>(`/api/transactions/${id}`),

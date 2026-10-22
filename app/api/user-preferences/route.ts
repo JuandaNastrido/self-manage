@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError, handleApiError } from "@/lib/utils/api-helpers";
 
 export async function GET() {
+  await connection();
   try {
     const prefs = await prisma.userPreferences.findUnique({
       where: { id: "default" },
@@ -27,6 +28,7 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  await connection();
   try {
     const body = await request.json().catch(() => null);
     if (!body) {

@@ -43,25 +43,26 @@ export function useTimer(): UseTimerResult {
   const [error, setError] = useState<string | null>(null);
 
   const calculateElapsed = useCallback((t: TimerState): number => {
-    if (!t.running) return 0;
     if (!t.startTime) return 0;
 
     const startTime = new Date(t.startTime).getTime();
-    const now = Date.now();
-    const elapsed = Math.floor((now - startTime) / 1000) - t.accumulatedSeconds;
+    // A paused timer's clock stops at `pausedAt`; a running one ticks now.
+    const endTime = t.running
+      ? Date.now()
+      : new Date(t.pausedAt ?? t.startTime).getTime();
+    const elapsed = Math.floor((endTime - startTime) / 1000) - t.accumulatedSeconds;
 
     return Math.max(0, elapsed);
   }, []);
 
-  const refresh = useCallback(async () => {
+  const load = useCallback(async () => {
     try {
-      setIsLoading(true);
-      setError(null);
       const state = await timerApi.getState();
       setTimer(state);
-      if (state?.running) {
+      if (state) {
         setElapsedSeconds(calculateElapsed(state));
       }
+      setError(null);
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -72,6 +73,11 @@ export function useTimer(): UseTimerResult {
       setIsLoading(false);
     }
   }, [calculateElapsed]);
+
+  const refresh = useCallback(async () => {
+    setIsLoading(true);
+    await load();
+  }, [load]);
 
   const start = useCallback(async (taskId?: string) => {
     try {
@@ -91,12 +97,13 @@ export function useTimer(): UseTimerResult {
       setError(null);
       const state = await timerApi.pause();
       setTimer(state);
+      setElapsedSeconds(calculateElapsed(state));
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Gagal pause timer"
       );
     }
-  }, []);
+  }, [calculateElapsed]);
 
   const resume = useCallback(async () => {
     try {
@@ -140,8 +147,10 @@ export function useTimer(): UseTimerResult {
 
   // Load timer state on mount
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    (async () => {
+      await load();
+    })();
+  }, [load]);
 
   return {
     timer,

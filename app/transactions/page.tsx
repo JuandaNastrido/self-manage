@@ -1,20 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Search, Filter, Edit, Trash2, Calendar, Tag } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Tag } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { transactionsApi, categoriesApi } from "@/lib/api/client";
 import { formatCurrency, parseAmount } from "@/lib/utils/money";
-import { formatDuration } from "@/lib/utils/ui";
 import { TransactionType } from "@prisma/client";
 import type { Transaction, Category } from "@prisma/client";
 
 interface ExtendedTransaction extends Transaction {
   category: Category;
-}
-
-interface ExtendedCategory extends Category {
-  _count?: { transactions: number; budgets: number };
 }
 
 export default function TransactionsPage() {
@@ -37,9 +32,9 @@ export default function TransactionsPage() {
         transactionsApi.list(),
         categoriesApi.list(),
       ]);
-      setTransactions(txns);
+      setTransactions(txns.transactions);
       setCategories(cats);
-    } catch (err) {
+    } catch  {
       setError("Gagal memuat data transaksi");
     } finally {
       setIsLoading(false);
@@ -47,7 +42,9 @@ export default function TransactionsPage() {
   }, []);
 
   useEffect(() => {
-    fetchData();
+    (async () => {
+      await fetchData();
+    })();
   }, [fetchData]);
 
   const filteredTxns = transactions.filter((txn) => {
@@ -70,13 +67,10 @@ export default function TransactionsPage() {
     try {
       await transactionsApi.delete(id);
       setTransactions((t) => t.filter((x) => x.id !== id));
-    } catch (err) {
+    } catch  {
       setError("Gagal menghapus transaksi");
     }
   };
-
-  const incomeCategories = categories.filter((c) => c.type === "INCOME");
-  const expenseCategories = categories.filter((c) => c.type === "EXPENSE");
 
   const resetFilters = () => {
     setFilterType("");
@@ -324,14 +318,12 @@ function TransactionFormModal({
       ? categories.filter((c) => c.type === "EXPENSE")
       : categories
 
-  // Auto-select first category if none selected when type changes
-  useEffect(() => {
-    if (!editingTxn && (!categoryId || !availableCategories.find((c) => c.id === categoryId))) {
-      if (availableCategories.length > 0) {
-        setCategoryId(availableCategories[0].id);
-      }
-    }
-  }, [type, categoryId, editingTxn, availableCategories]);
+  // Auto-select first category if none selected when type changes.
+  // Derived during render rather than synced through an effect.
+  const selectedCategoryId =
+    categoryId && availableCategories.some((c) => c.id === categoryId)
+      ? categoryId
+      : (availableCategories[0]?.id ?? "");
 
   // Need useEffect import for this
   // Actually, I can't use useEffect inside a child component without importing it
@@ -347,7 +339,7 @@ function TransactionFormModal({
       return;
     }
 
-    if (!categoryId) {
+    if (!selectedCategoryId) {
       setSubmitError("Pilih kategori");
       return;
     }
@@ -357,7 +349,7 @@ function TransactionFormModal({
       const data = {
         amount: parsedAmount,
         type,
-        categoryId,
+        categoryId: selectedCategoryId,
         date: new Date(date).toISOString(),
         description: description || undefined,
       };
@@ -452,7 +444,7 @@ function TransactionFormModal({
               Kategori
             </label>
             <select
-              value={categoryId}
+              value={selectedCategoryId}
               onChange={(e) => setCategoryId(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500"
               required

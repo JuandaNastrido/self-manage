@@ -1,14 +1,15 @@
-import { NextResponse } from "next/server";
+import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { apiResponse, apiError, handleApiError } from "@/lib/utils/api-helpers";
+import { apiResponse, handleApiError } from "@/lib/utils/api-helpers";
 import { TransactionType } from "@prisma/client";
 
 /**
- * Seed endpoint — creates default categories and an empty transaction database.
+ * Seed endpoint Ã¢â‚¬â€ creates default categories and an empty transaction database.
  * This is useful for first-time setup.
  * POST /api/seed
  */
 export async function POST() {
+  await connection();
   try {
     // Check if already seeded
     const count = await prisma.category.count();

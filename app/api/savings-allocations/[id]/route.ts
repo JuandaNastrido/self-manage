@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError, handleApiError } from "@/lib/utils/api-helpers";
 
@@ -6,6 +6,7 @@ export async function DELETE(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
+  await connection();
   try {
     const { id } = await context.params;
 

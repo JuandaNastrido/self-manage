@@ -1,37 +1,48 @@
 /**
  * Dashboard service — aggregates financial data, task statistics,
  * and timer state into a single summary view.
+ *
  * All calculations are deterministic, using verified application logic.
+ * Both the API route and the dashboard page consume this service so both
+ * always render the exact same numbers.
  */
-import { Prisma, TaskStatus, TaskPriority } from "@prisma/client";
 import { prisma } from "../prisma";
-import { FinanceService } from "./finance";
-import { TimerService } from "./timer";
+import type { Budget, Category, SavingsAllocation, SavingsGoal } from "@prisma/client";
 
-export interface DashboardSummary {
+export interface DashboardBudget extends Budget {
+  category: Category;
+  spent: number;
+  remaining: number;
+  utilizationPercent: number;
+  isOverBudget: boolean;
+}
+
+export interface DashboardSavingsGoal extends SavingsGoal {
+  allocations: SavingsAllocation[];
+  currentAmount: number;
+  progressPercent: number;
+  isComplete: boolean;
+}
+
+export interface DashboardData {
   balance: number;
   currency: string;
-  monthlyIncome: number;
-  monthlyExpenses: number;
-  monthlyNetCashFlow: number;
-  activeBudgets: number;
-  overBudgetCategories: number;
-  totalSavingsGoals: number;
-  totalSavingsProgress: number;
-  taskSummary: {
-    total: number;
-    todo: number;
-    inProgress: number;
-    done: number;
-    overdue: number;
-    completionRate: number;
+  monthly: {
+    year: number;
+    month: number;
+    income: number;
+    expenses: number;
+    netCashFlow: number;
   };
-  topExpenseCategories: Array<{
+  perCategory: Array<{
     categoryId: string;
     categoryName: string;
-    color: string | null;
-    total: number;
+    type: string;
+    totalAmount: number;
+    transactionCount: number;
   }>;
+  budgets: DashboardBudget[];
+  savingsGoals: DashboardSavingsGoal[];
   recentTransactions: Array<{
     id: string;
     amount: number;
@@ -41,105 +52,166 @@ export interface DashboardSummary {
     categoryName: string;
     categoryColor: string | null;
   }>;
+  taskSummary: {
+    total: number;
+    todo: number;
+    inProgress: number;
+    done: number;
+    overdue: number;
+    completionRate: number;
+  };
   activeTimer: {
-    running: boolean;
+    id: string;
     taskId: string | null;
     taskTitle: string | null;
-    elapsedSeconds: number;
+    startTime: string;
+    pausedAt: string | null;
+    accumulatedSeconds: number;
+    running: boolean;
   } | null;
 }
 
 export class DashboardService {
   /**
-   * Get complete dashboard summary for the current month.
-   * All metrics computed from verified application logic.
+   * Build the full dashboard summary for a given month.
+   *
+   * @param year - Calendar year (defaults to the current year)
+   * @param month - Zero-based month index (defaults to the current month)
    */
-  static async getSummary(): Promise<DashboardSummary> {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
+  static async getDashboardData(
+    year: number = new Date().getFullYear(),
+    month: number = new Date().getMonth()
+  ): Promise<DashboardData> {
+    // 1. Balance (all-time)
+    const txnGroup = await prisma.transaction.groupBy({
+      by: ["type"],
+      _sum: { amount: true },
+    });
 
-    // 1. Balance
-    const balance = await FinanceService.calculateBalance();
+    let totalIncome = 0;
+    let totalExpenses = 0;
+    for (const row of txnGroup) {
+      const sum = row._sum.amount ?? 0;
+      if (row.type === "INCOME" || row.type === "REFUND") {
+        totalIncome += sum;
+      } else {
+        totalExpenses += sum;
+      }
+    }
+    const balance = totalIncome - totalExpenses;
 
-    // 2. Monthly financial summary
-    const monthlySummary = await FinanceService.calculateMonthlySummary(year, month);
+    // 2. Monthly summary
+    const start = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
+    const end = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
 
-    // 3. Budget status
+    const monthlyGroup = await prisma.transaction.groupBy({
+      by: ["type"],
+      where: { date: { gte: start, lte: end } },
+      _sum: { amount: true },
+    });
+
+    let monthlyIncome = 0;
+    let monthlyExpenses = 0;
+    for (const row of monthlyGroup) {
+      const sum = row._sum.amount ?? 0;
+      if (row.type === "INCOME" || row.type === "REFUND") {
+        monthlyIncome += sum;
+      } else {
+        monthlyExpenses += sum;
+      }
+    }
+
+    // 3. Per-category breakdown
+    const categoryGroup = await prisma.transaction.groupBy({
+      by: ["categoryId"],
+      where: { date: { gte: start, lte: end } },
+      _sum: { amount: true },
+      _count: { _all: true },
+    });
+
+    const categories = await prisma.category.findMany();
+    const categoryMap = new Map(categories.map((c) => [c.id, c]));
+
+    const perCategory = categoryGroup.map((row) => {
+      const cat = categoryMap.get(row.categoryId);
+      return {
+        categoryId: row.categoryId,
+        categoryName: cat?.name ?? "Unknown",
+        type: cat?.type ?? "UNKNOWN",
+        totalAmount: row._sum.amount ?? 0,
+        transactionCount: row._count._all ?? 0,
+      };
+    });
+
+    // 4. Budgets with utilization
     const budgets = await prisma.budget.findMany({
       where: { year, month },
       include: { category: true },
     });
-    const overBudget = await Promise.all(
-      budgets.map(async (b) => {
-        const util = await FinanceService.calculateBudgetUtilization(
-          b.categoryId, year, month
-        );
-        return { ...b, spent: util.spent, overBudget: util.spent > b.amount };
-      })
-    );
-    const overBudgetCount = overBudget.filter((b) => b.overBudget).length;
 
-    // 4. Savings goals
-    const savingsGoals = await prisma.savingsGoal.findMany();
-    const totalTarget = savingsGoals.reduce((s, g) => s + g.targetAmount, 0);
-    const totalCurrent = savingsGoals.reduce((s, g) => s + g.currentAmount, 0);
-    const savingsProgress = totalTarget > 0 ? (totalCurrent / totalTarget) * 100 : 0;
-
-    // 5. Task summary
-    const taskCounts = await prisma.$transaction([
-      prisma.task.count({ where: { status: { not: TaskStatus.ARCHIVED } } }),
-      prisma.task.count({ where: { status: TaskStatus.TODO } }),
-      prisma.task.count({ where: { status: TaskStatus.IN_PROGRESS } }),
-      prisma.task.count({ where: { status: TaskStatus.DONE } }),
-      prisma.task.count({
-        where: {
-          status: { notIn: [TaskStatus.DONE, TaskStatus.ARCHIVED] },
-          dueDate: { lt: new Date() },
-        },
-      }),
-    ]);
-
-    const taskSummary = {
-      total: taskCounts[0],
-      todo: taskCounts[1],
-      inProgress: taskCounts[2],
-      done: taskCounts[3],
-      overdue: taskCounts[4],
-      completionRate: taskCounts[0] > 0 ? (taskCounts[3] / taskCounts[0]) * 100 : 0,
-    };
-
-    // 6. Top expense categories (by total spending this month)
-    const expenseCategoryTotals = await prisma.transaction.groupBy({
-      by: ["categoryId"],
-      where: {
-        type: { in: ["EXPENSE", "REFUND"] },
-        date: {
-          gte: new Date(Date.UTC(year, month, 1)),
-          lte: new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999)),
-        },
-      },
-      _sum: { amount: true },
-    });
-
-    const categoryTotals = await Promise.all(
-      expenseCategoryTotals.map(async (row) => {
-        const cat = await prisma.category.findUnique({
-          where: { id: row.categoryId },
-          select: { name: true, color: true },
+    const budgetsWithUtilization: DashboardBudget[] = await Promise.all(
+      budgets.map(async (budget) => {
+        const expenseSum = await prisma.transaction.aggregate({
+          where: {
+            categoryId: budget.categoryId,
+            type: "EXPENSE",
+            date: { gte: start, lte: end },
+          },
+          _sum: { amount: true },
         });
+
+        const refundSum = await prisma.transaction.aggregate({
+          where: {
+            categoryId: budget.categoryId,
+            type: "REFUND",
+            date: { gte: start, lte: end },
+          },
+          _sum: { amount: true },
+        });
+
+        const spent = (expenseSum._sum.amount ?? 0) - (refundSum._sum.amount ?? 0);
+        const total = budget.amount;
+        const util = total > 0 ? (spent / total) * 100 : 0;
+
         return {
-          categoryId: row.categoryId,
-          categoryName: cat?.name ?? "Unknown",
-          color: cat?.color ?? null,
-          total: row._sum.amount ?? 0,
+          ...budget,
+          spent,
+          remaining: total - spent,
+          utilizationPercent: Math.round(util * 10) / 10,
+          isOverBudget: spent > total,
         };
       })
     );
 
-    const topExpenseCategories = categoryTotals
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 5);
+    // 5. Savings goals with progress
+    const savingsGoals = await prisma.savingsGoal.findMany({
+      include: { allocations: true },
+    });
+
+    const savingsWithProgress: DashboardSavingsGoal[] = savingsGoals.map((goal) => {
+      const currentAmount = goal.allocations.reduce((sum, a) => sum + a.amount, 0);
+      const progress = goal.targetAmount > 0 ? (currentAmount / goal.targetAmount) * 100 : 0;
+      return {
+        ...goal,
+        currentAmount,
+        progressPercent: Math.round(progress * 10) / 10,
+        isComplete: currentAmount >= goal.targetAmount,
+      };
+    });
+
+    // 6. Task summary
+    const taskStats = await prisma.$transaction([
+      prisma.task.count({ where: { status: { not: "ARCHIVED" } } }),
+      prisma.task.count({ where: { status: "TODO" } }),
+      prisma.task.count({ where: { status: "IN_PROGRESS" } }),
+      prisma.task.count({ where: { status: "DONE" } }),
+      prisma.task.count({
+        where: {
+          status: { notIn: ["DONE", "ARCHIVED"] },
+          dueDate: { lt: new Date() },
+        },
+      }),
+    ]);
 
     // 7. Recent transactions (last 10)
     const recentTxns = await prisma.transaction.findMany({
@@ -157,28 +229,13 @@ export class DashboardService {
       categoryColor: t.category.color,
     }));
 
-    // 8. Active timer state
-    const timerState = await TimerService.getTimerState();
-    let activeTimer = null;
-    if (timerState && timerState.running) {
-      const elapsed = TimerService.calculateElapsed(timerState);
-      let taskTitle: string | null = null;
-      if (timerState.taskId) {
-        const task = await prisma.task.findUnique({
-          where: { id: timerState.taskId },
-          select: { title: true },
-        });
-        taskTitle = task?.title ?? null;
-      }
-      activeTimer = {
-        running: true,
-        taskId: timerState.taskId,
-        taskTitle,
-        elapsedSeconds: elapsed.elapsedSeconds,
-      };
-    }
+    // 8. Active timer
+    const activeTimer = await prisma.timerState.findFirst({
+      where: { running: true },
+      include: { task: true },
+    });
 
-    // Get currency from user preferences
+    // 9. Currency preference
     const prefs = await prisma.userPreferences.findUnique({
       where: { id: "default" },
     });
@@ -186,17 +243,36 @@ export class DashboardService {
     return {
       balance,
       currency: prefs?.currency ?? "IDR",
-      monthlyIncome: monthlySummary.totalIncome,
-      monthlyExpenses: monthlySummary.totalExpenses,
-      monthlyNetCashFlow: monthlySummary.netCashFlow,
-      activeBudgets: budgets.length,
-      overBudgetCategories: overBudgetCount,
-      totalSavingsGoals: savingsGoals.length,
-      totalSavingsProgress: Math.round(savingsProgress * 10) / 10,
-      taskSummary,
-      topExpenseCategories,
+      monthly: {
+        year,
+        month,
+        income: monthlyIncome,
+        expenses: monthlyExpenses,
+        netCashFlow: monthlyIncome - monthlyExpenses,
+      },
+      perCategory,
+      budgets: budgetsWithUtilization,
+      savingsGoals: savingsWithProgress,
       recentTransactions,
-      activeTimer,
+      taskSummary: {
+        total: taskStats[0],
+        todo: taskStats[1],
+        inProgress: taskStats[2],
+        done: taskStats[3],
+        overdue: taskStats[4],
+        completionRate: taskStats[0] > 0 ? (taskStats[3] / taskStats[0]) * 100 : 0,
+      },
+      activeTimer: activeTimer
+        ? {
+            id: activeTimer.id,
+            taskId: activeTimer.taskId,
+            taskTitle: activeTimer.task?.title ?? null,
+            startTime: activeTimer.startTime.toISOString(),
+            pausedAt: activeTimer.pausedAt?.toISOString() ?? null,
+            accumulatedSeconds: activeTimer.accumulatedSeconds,
+            running: activeTimer.running,
+          }
+        : null,
     };
   }
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { connection } from "next/server";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,11 +19,22 @@ export const metadata: Metadata = {
     "Personal finance tracking, task management, and self-balancing dashboard.",
 };
 
-export default function RootLayout({
+// This app renders live data from a local SQLite database on every visit, so
+// routes are allowed to block on the server instead of serving a prerendered
+// static shell.
+export const instant = false;
+
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Every page shows live data from the local SQLite database, which changes
+  // while the app is running. Waiting for the incoming request keeps Next.js
+  // from prerendering stale data, and lets client components read the current
+  // date/time safely at request time.
+  await connection();
+
   return (
     <html lang="id" className="h-full">
       <body

@@ -4,7 +4,6 @@
 import { Prisma, TaskPriority, TaskStatus } from "@prisma/client";
 import { prisma } from "../prisma";
 import { CreateTaskInput, UpdateTaskInput, GetTasksQuery } from "../validators/task";
-import { isSameDay } from "../utils/date";
 
 export class TaskService {
   /**

@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
+import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError, handleApiError } from "@/lib/utils/api-helpers";
-import { createTaskSchema, getTasksQuerySchema } from "@/lib/validators/task";
+import { createTaskSchema } from "@/lib/validators/task";
 import { Prisma, TaskPriority, TaskStatus } from "@prisma/client";
 
 export async function GET(request: Request) {
+  await connection();
   try {
     const { searchParams } = new URL(request.url);
 
@@ -103,6 +104,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  await connection();
   try {
     const body = await request.json().catch(() => null);
     if (!body) {

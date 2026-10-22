@@ -1,17 +1,30 @@
-import { NextResponse } from "next/server";
+import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError, handleApiError } from "@/lib/utils/api-helpers";
-import { TimerService } from "@/lib/services/timer";
+import { Prisma } from "@prisma/client";
 
 export async function GET(request: Request) {
+  await connection();
   try {
     const { searchParams } = new URL(request.url);
     const taskId = searchParams.get("taskId");
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
 
-    const where: Record<string, unknown> = {};
+    const where: Prisma.TimeEntryWhereInput = {};
     if (taskId) where.taskId = taskId;
+
+    if (startDate || endDate) {
+      where.startTime = {};
+      if (startDate) {
+        const from = new Date(startDate);
+        if (!isNaN(from.getTime())) where.startTime.gte = from;
+      }
+      if (endDate) {
+        const to = new Date(endDate);
+        if (!isNaN(to.getTime())) where.startTime.lte = to;
+      }
+    }
 
     const timeEntries = await prisma.timeEntry.findMany({
       where,
@@ -30,6 +43,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  await connection();
   try {
     const body = await request.json().catch(() => null);
     if (!body) {

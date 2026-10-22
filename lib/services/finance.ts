@@ -13,11 +13,7 @@
  */
 import { Prisma, TransactionType } from "@prisma/client";
 import { prisma } from "../prisma";
-import {
-  MonthlyFinancialSummary,
-  BudgetUtilization,
-  SavingsProgress,
-} from "../types";
+import { MonthlyFinancialSummary, SavingsProgress } from "../types";
 
 export class FinanceService {
   /**
@@ -124,12 +120,6 @@ export class FinanceService {
       existing.totalAmount += sum;
       existing.transactionCount += row._count._all ?? 0;
     }
-
-    // Compute budget utilization for this month
-    const budgets = await prisma.budget.findMany({
-      where: { year, month },
-      include: { category: { select: { name: true, type: true } } },
-    });
 
     // Calculate budget spent for each budget
     const perCategory = Array.from(categoryMap.values());

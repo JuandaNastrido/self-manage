@@ -6,14 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "lint:fix": "next lint --fix",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
-    "prisma:reset": "prisma db reset",
+    "prisma:reset": "prisma migrate reset",
+    "prisma:seed:demo": "tsx prisma/seed-demo.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
@@ -43,6 +44,7 @@
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
     "ts-jest": "^29.4.15",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

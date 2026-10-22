@@ -1,13 +1,9 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { connection } from "next/server";
 import { apiResponse, apiError, handleApiError } from "@/lib/utils/api-helpers";
-import {
-  TimerService,
-  STALE_TIMER_THRESHOLD_MS,
-  INACTIVITY_AUTO_STOP_MINUTES,
-} from "@/lib/services/timer";
+import { TimerService } from "@/lib/services/timer";
 
 export async function GET() {
+  await connection();
   try {
     // Check for stale timer and auto-stop if needed
     await TimerService.checkStaleTimer();
@@ -20,6 +16,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  await connection();
   try {
     const body = await request.json().catch(() => null);
     if (!body || !body.action) {
@@ -67,6 +64,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE() {
+  await connection();
   try {
     await TimerService.clearTimer();
     return apiResponse({ success: true });

@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
+import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError, handleApiError } from "@/lib/utils/api-helpers";
-import { TransactionType } from "@prisma/client";
 
 export async function GET() {
+  await connection();
   try {
     const goals = await prisma.savingsGoal.findMany({
       include: {
@@ -17,10 +17,13 @@ export async function GET() {
 
     const result = await Promise.all(
       goals.map(async (goal) => {
-        const currentAmount = goal.allocations.reduce(
-          (sum, a) => sum + a.amount,
-          0
-        );
+        // Sum over ALL allocations — the `take: 5` above only limits which
+        // rows are returned for display, not what counts towards the progress.
+        const total = await prisma.savingsAllocation.aggregate({
+          where: { savingsGoalId: goal.id },
+          _sum: { amount: true },
+        });
+        const currentAmount = total._sum.amount ?? 0;
         const progress =
           goal.targetAmount > 0
             ? Math.round((currentAmount / goal.targetAmount) * 1000) / 10
@@ -42,6 +45,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  await connection();
   try {
     const body = await request.json().catch(() => null);
     if (!body) {

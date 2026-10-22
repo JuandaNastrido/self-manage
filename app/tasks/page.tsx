@@ -10,11 +10,11 @@ import {
   Pause,
   Square,
   Clock,
-  Filter,
 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { tasksApi } from "@/lib/api/client";
 import { useTimer } from "@/hooks/useTimer";
+import { useNow } from "@/hooks/useNow";
 import { formatDuration } from "@/lib/utils/ui";
 import { TaskPriority, TaskStatus } from "@prisma/client";
 import type { Task, TaskCategory, TimeEntry } from "@prisma/client";
@@ -38,15 +38,18 @@ export default function TasksPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Timer hook
-  const { timer, elapsedSeconds, isRunning, start, pause, resume, stop, refresh } =
+  const { timer, elapsedSeconds, isRunning, start, pause, resume, stop } =
     useTimer();
+
+  // Shared "current time" used to determine overdue tasks
+  const now = useNow();
 
   const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
       const result = await tasksApi.list();
       setTasks(result);
-    } catch (err) {
+    } catch  {
       setError("Gagal memuat tugas");
     } finally {
       setIsLoading(false);
@@ -54,7 +57,9 @@ export default function TasksPage() {
   }, []);
 
   useEffect(() => {
-    fetchData();
+    (async () => {
+      await fetchData();
+    })();
   }, [fetchData]);
 
   const filteredTasks = tasks.filter((task) => {
@@ -130,7 +135,7 @@ export default function TasksPage() {
     try {
       await tasksApi.delete(taskId);
       setTasks((t) => t.filter((x) => x.id !== taskId));
-    } catch (err) {
+    } catch  {
       setError("Gagal menghapus tugas");
     }
   };
@@ -180,39 +185,47 @@ export default function TasksPage() {
   };
 
   const isTimerForTask = (taskId: string) => {
-    return isRunning && timer?.taskId === taskId;
-  };
-
-  const isTimerForOther = () => {
-    return isRunning && timer?.taskId && !tasks.find((t) => t.id === timer?.taskId);
+    return timer?.taskId === taskId;
   };
 
   return (
     <AppLayout title="Tugas">
       <div className="space-y-6">
         {/* Active timer display */}
-        {isRunning && timer && (
+        {timer && (
           <div className="fixed bottom-6 right-6 z-30">
             <div className="bg-gray-900 text-white rounded-xl shadow-xl px-4 py-3 flex items-center gap-3 min-w-[240px]">
-              <Clock className="h-4 w-4 text-blue-400 animate-pulse" />
+              <Clock className={`h-4 w-4 text-blue-400 ${timer.running ? "animate-pulse" : ""}`} />
               <div>
                 <div className="text-xs opacity-70">
                   {timer.task?.title
-                    ? `Sedang: ${timer.task.title}`
-                    : "Timer aktif"}
+                    ? `${timer.running ? "Sedang" : "Dijeda"}: ${timer.task.title}`
+                    : timer.running
+                    ? "Timer aktif"
+                    : "Timer dijeda"}
                 </div>
                 <div className="font-mono font-bold text-lg">
                   {formatDuration(elapsedSeconds)}
                 </div>
               </div>
               <div className="flex gap-1">
-                <button
-                  onClick={handlePauseTimer}
-                  className="p-1 hover:bg-gray-800 rounded"
-                  title="Pause"
-                >
-                  <Pause className="h-4 w-4" />
-                </button>
+                {timer.running ? (
+                  <button
+                    onClick={handlePauseTimer}
+                    className="p-1 hover:bg-gray-800 rounded"
+                    title="Pause"
+                  >
+                    <Pause className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleResumeTimer}
+                    className="p-1 hover:bg-gray-800 rounded text-green-400"
+                    title="Lanjutkan"
+                  >
+                    <Play className="h-4 w-4" />
+                  </button>
+                )}
                 <button
                   onClick={handleStopTimer}
                   className="p-1 hover:bg-gray-800 rounded text-red-400"
@@ -315,8 +328,10 @@ export default function TasksPage() {
               <TaskCard
                 key={task.id}
                 task={task}
+                now={now}
                 isTimerActiveForThis={isTimerForTask(task.id)}
                 isTimerRunning={isRunning}
+                timerRunning={timer?.running ?? false}
                 timerElapsed={elapsedSeconds}
                 onStartTimer={() => handleStartTimer(task.id)}
                 onPauseTimer={handlePauseTimer}
@@ -360,8 +375,10 @@ export default function TasksPage() {
 
 function TaskCard({
   task,
+  now,
   isTimerActiveForThis,
   isTimerRunning,
+  timerRunning,
   timerElapsed,
   onStartTimer,
   onPauseTimer,
@@ -373,8 +390,10 @@ function TaskCard({
   statusLabel,
 }: {
   task: ExtendedTask;
+  now: number;
   isTimerActiveForThis: boolean;
   isTimerRunning: boolean;
+  timerRunning: boolean;
   timerElapsed: number;
   onStartTimer: () => void;
   onPauseTimer: () => void;
@@ -401,7 +420,7 @@ function TaskCard({
 
   const isOverdue =
     task.dueDate &&
-    new Date(task.dueDate).getTime() < Date.now() &&
+    new Date(task.dueDate).getTime() < now &&
     task.status !== TaskStatus.DONE &&
     task.status !== TaskStatus.ARCHIVED;
 
@@ -424,16 +443,28 @@ function TaskCard({
                 <div className="font-mono font-bold text-lg text-gray-900 dark:text-gray-100">
                   {formatDuration(timerElapsed)}
                 </div>
-                <div className="text-xs text-gray-500">berjalan</div>
+                <div className="text-xs text-gray-500">
+                  {timerRunning ? "berjalan" : "dijeda"}
+                </div>
               </div>
               <div className="flex gap-1">
-                <button
-                  onClick={onPauseTimer}
-                  className="p-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200"
-                  title="Pause"
-                >
-                  <Pause className="h-4 w-4" />
-                </button>
+                {timerRunning ? (
+                  <button
+                    onClick={onPauseTimer}
+                    className="p-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200"
+                    title="Pause"
+                  >
+                    <Pause className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={onResumeTimer}
+                    className="p-1 bg-green-100 text-green-700 rounded hover:bg-green-200"
+                    title="Lanjutkan"
+                  >
+                    <Play className="h-4 w-4" />
+                  </button>
+                )}
                 <button
                   onClick={onStopTimer}
                   className="p-1 bg-red-100 text-red-700 rounded hover:bg-red-200"
@@ -584,19 +615,17 @@ function TaskFormModal({
   );
 
   useEffect(() => {
-    const fetchCategories = async () => {
+    (async () => {
       try {
-        // Using fetch directly for task categories
         const res = await fetch("/api/task-categories");
         const json = await res.json();
         if (json.success) {
           setTaskCategories(json.data);
         }
-      } catch (err) {
+      } catch {
         // Silent fail — categories are optional
       }
-    };
-    fetchCategories();
+    })();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -717,6 +746,25 @@ function TaskFormModal({
               <option value={TaskStatus.TODO}>Belum Mulai</option>
               <option value={TaskStatus.IN_PROGRESS}>Sedang Dikerjakan</option>
               <option value={TaskStatus.DONE}>Selesai</option>
+            </select>
+          </div>
+
+          {/* Task category selector */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Kategori
+            </label>
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Tanpa kategori</option>
+              {taskCategories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
             </select>
           </div>
 

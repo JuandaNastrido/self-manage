@@ -1,13 +1,13 @@
-import { NextResponse } from "next/server";
+import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError, handleApiError } from "@/lib/utils/api-helpers";
 import { updateCategorySchema } from "@/lib/validators/category";
-import { TransactionService } from "@/lib/services/transactions";
 
 export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
+  await connection();
   try {
     const { id } = await context.params;
     const category = await prisma.category.findUnique({
@@ -33,6 +33,7 @@ export async function PUT(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
+  await connection();
   try {
     const { id } = await context.params;
     const body = await request.json().catch(() => null);
@@ -61,6 +62,7 @@ export async function DELETE(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
+  await connection();
   try {
     const { id } = await context.params;
 

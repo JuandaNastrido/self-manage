@@ -10,19 +10,51 @@
  */
 import { prisma } from "../prisma";
 import { TimerElapsed } from "../types";
-import type { TimerState, TimeEntry } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import type { TimeEntry } from "@prisma/client";
 
 export const STALE_TIMER_THRESHOLD_MS = 8 * 60 * 60 * 1000; // 8 hours
 export const INACTIVITY_AUTO_STOP_MINUTES = 120; // 2 hours
+
+/**
+ * Minimal shape needed to calculate elapsed time.
+ * Accepting a structural subset keeps the calculation testable without a
+ * full Prisma model instance.
+ */
+export interface TimerElapsedInput {
+  startTime: Date;
+  pausedAt: Date | null;
+  accumulatedSeconds: number;
+  running: boolean;
+}
+
+/**
+ * Timer state including the related task, so the UI can show which task the
+ * timer belongs to.
+ */
+export type TimerStateWithTask = Prisma.TimerStateGetPayload<{
+  include: {
+    task: {
+      select: { id: true; title: true; priority: true; status: true };
+    };
+  };
+}>;
+
+const TIMER_INCLUDE = {
+  task: {
+    select: { id: true, title: true, priority: true, status: true },
+  },
+} satisfies Prisma.TimerStateInclude;
 
 export class TimerService {
   /**
    * Get the current active timer state.
    * Returns null if no timer is configured.
    */
-  static async getTimerState(): Promise<TimerState | null> {
+  static async getTimerState(): Promise<TimerStateWithTask | null> {
     return prisma.timerState.findUnique({
       where: { id: "active" },
+      include: TIMER_INCLUDE,
     });
   }
 
@@ -30,7 +62,7 @@ export class TimerService {
    * Start a new timer for a task.
    * @throws if a timer is already running and not stale
    */
-  static async startTimer(taskId?: string | null): Promise<TimerState> {
+  static async startTimer(taskId?: string | null): Promise<TimerStateWithTask> {
     // Check if a running timer already exists
     const existing = await prisma.timerState.findUnique({
       where: { id: "active" },
@@ -62,14 +94,14 @@ export class TimerService {
         accumulatedSeconds: 0,
         running: true,
       },
-      include: undefined,
+      include: TIMER_INCLUDE,
     });
   }
 
   /**
    * Pause the current timer.
    */
-  static async pauseTimer(): Promise<TimerState> {
+  static async pauseTimer(): Promise<TimerStateWithTask> {
     const existing = await prisma.timerState.findUnique({
       where: { id: "active" },
     });
@@ -84,13 +116,14 @@ export class TimerService {
         pausedAt: new Date(),
         running: false,
       },
+      include: TIMER_INCLUDE,
     });
   }
 
   /**
    * Resume a paused timer.
    */
-  static async resumeTimer(): Promise<TimerState> {
+  static async resumeTimer(): Promise<TimerStateWithTask> {
     const existing = await prisma.timerState.findUnique({
       where: { id: "active" },
     });
@@ -116,7 +149,7 @@ export class TimerService {
         pausedAt: null,
         running: true,
       },
-      include: undefined,
+      include: TIMER_INCLUDE,
     });
   }
 
@@ -129,29 +162,34 @@ export class TimerService {
       where: { id: "active" },
     });
 
-    if (!existing) {
+    // A cleared timer keeps the epoch as a placeholder start time — stopping
+    // it would otherwise record a multi-decade time entry.
+    if (!existing || existing.startTime.getTime() === 0) {
       throw new Error("No active timer to stop.");
     }
 
-    if (!existing.running) {
-      throw new Error("Timer is not running.");
-    }
+    // The clock stops at `pausedAt` for a paused timer, and at "now" for a
+    // running one. Elapsed time is always derived from stored timestamps.
+    const endTime = existing.running
+      ? new Date()
+      : (existing.pausedAt ?? new Date());
 
-    // Calculate elapsed time from timestamps
-    const now = Date.now();
-    const elapsedSeconds = Math.floor(
-      (now - existing.startTime.getTime()) / 1000 - existing.accumulatedSeconds
+    const elapsedSeconds = Math.max(
+      0,
+      Math.floor(
+        (endTime.getTime() - existing.startTime.getTime()) / 1000 -
+          existing.accumulatedSeconds
+      )
     );
 
-    // Ensure non-negative
-    const finalDuration = Math.max(0, elapsedSeconds);
+    const finalDuration = elapsedSeconds;
 
     // Create TimeEntry
     const timeEntry = await prisma.timeEntry.create({
       data: {
         taskId: existing.taskId,
         startTime: existing.startTime,
-        endTime: new Date(),
+        endTime,
         durationSeconds: finalDuration,
       },
     });
@@ -175,10 +213,15 @@ export class TimerService {
    * Calculate current elapsed time from a stored TimerState.
    * Used by frontend to show live elapsed time without polling the DB every second.
    */
-  static calculateElapsed(state: TimerState): TimerElapsed {
-    const now = Date.now();
-    const elapsedMs =
-      now - state.startTime.getTime() - state.accumulatedSeconds * 1000;
+  static calculateElapsed(state: TimerElapsedInput): TimerElapsed {
+    const startMs = state.startTime.getTime();
+    // A paused timer's clock stops at `pausedAt`; a running one ticks now.
+    const endMs = state.running
+      ? Date.now()
+      : state.pausedAt
+      ? state.pausedAt.getTime()
+      : startMs;
+    const elapsedMs = endMs - startMs - state.accumulatedSeconds * 1000;
 
     const elapsedSeconds = Math.floor(elapsedMs / 1000);
     const isStale = elapsedMs > STALE_TIMER_THRESHOLD_MS;

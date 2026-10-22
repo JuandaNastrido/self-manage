@@ -113,7 +113,7 @@ describe("sumAmounts", () => {
   });
 
   it("ignores non-numeric values", () => {
-    const arr = [100, NaN, 200, undefined as any, 300];
+    const arr = [100, NaN, 200, undefined as unknown as number, 300];
     expect(sumAmounts(arr)).toBe(600);
   });
 
@@ -132,8 +132,6 @@ describe("CURRENCY_PRECISION", () => {
 
 describe("no floating-point arithmetic for money", () => {
   it("sumAmounts never produces floating-point artifacts", () => {
-    // Classic floating-point issues
-    const amounts = Array(10).fill(0.1) as any; // Would be 0.1 * 10 if not truncated
     // With integer arithmetic, each amount is truncated first
     expect(sumAmounts([10, 10, 10, 10, 10, 10, 10, 10, 10, 10])).toBe(100);
     // Large number precision

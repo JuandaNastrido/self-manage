@@ -1,13 +1,14 @@
-import { NextResponse } from "next/server";
+import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError, handleApiError } from "@/lib/utils/api-helpers";
-import { TaskPriority, TaskStatus } from "@prisma/client";
-import { createTaskSchema, updateTaskSchema } from "@/lib/validators/task";
+import { TaskStatus } from "@prisma/client";
+import { updateTaskSchema } from "@/lib/validators/task";
 
 export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
+  await connection();
   try {
     const { id } = await context.params;
 
@@ -44,6 +45,7 @@ export async function PUT(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
+  await connection();
   try {
     const { id } = await context.params;
     const body = await request.json().catch(() => null);
@@ -94,6 +96,7 @@ export async function DELETE(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
+  await connection();
   try {
     const { id } = await context.params;
 

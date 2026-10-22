@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
+import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { apiResponse, apiError, handleApiError, parseBody } from "@/lib/utils/api-helpers";
+import { apiResponse, apiError, handleApiError } from "@/lib/utils/api-helpers";
 import { createCategorySchema, getCategoriesQuerySchema } from "@/lib/validators/category";
-import { TransactionType } from "@prisma/client";
 
 export async function GET(request: Request) {
+  await connection();
   try {
     const { searchParams } = new URL(request.url);
 
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
           select: { transactions: true, budgets: true },
         },
       },
-      orderBy: { type: "asc", name: "asc" },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
     });
 
     return apiResponse(categories);
@@ -32,6 +32,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  await connection();
   try {
     const body = await request.json().catch(() => null);
     if (!body) {

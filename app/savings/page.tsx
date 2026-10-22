@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Edit, Trash2, PiggyBank, Calendar, Target } from "lucide-react";
+import { Plus, Edit, Trash2, PiggyBank } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { savingsGoalsApi, transactionsApi } from "@/lib/api/client";
 import { formatCurrency, parseAmount } from "@/lib/utils/money";
 import { formatDate } from "@/lib/utils/ui";
-import type { SavingsGoal, Transaction, Category } from "@prisma/client";
+import type { SavingsGoal, Transaction } from "@prisma/client";
 
 interface ExtendedSavingsGoal extends SavingsGoal {
   allocations: Allocation[];
@@ -39,8 +39,8 @@ export default function SavingsPage() {
       const goalsRes = await savingsGoalsApi.list();
       const txnsRes = await transactionsApi.list();
       setGoals(goalsRes);
-      setTransactions(txnsRes);
-    } catch (err) {
+      setTransactions(txnsRes.transactions);
+    } catch  {
       setError("Gagal memuat data tabungan");
     } finally {
       setIsLoading(false);
@@ -48,7 +48,9 @@ export default function SavingsPage() {
   }, []);
 
   useEffect(() => {
-    fetchData();
+    (async () => {
+      await fetchData();
+    })();
   }, [fetchData]);
 
   const handleDeleteGoal = async (id: string) => {
@@ -56,7 +58,7 @@ export default function SavingsPage() {
     try {
       await savingsGoalsApi.delete(id);
       setGoals((g) => g.filter((x) => x.id !== id));
-    } catch (err) {
+    } catch  {
       setError("Gagal menghapus tujuan");
     }
   };

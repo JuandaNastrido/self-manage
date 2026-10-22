@@ -5,14 +5,6 @@
  */
 import { TimerService, STALE_TIMER_THRESHOLD_MS } from "@/lib/services/timer";
 
-// Helper to create a mock TimerState compatible with TimerService.calculateElapsed
-interface MockTimerState {
-  startTime: Date;
-  pausedAt: Date | null;
-  accumulatedSeconds: number;
-  running: boolean;
-}
-
 describe("TimerService.calculateElapsed", () => {
   it("calculates elapsed correctly for a running timer", () => {
     const now = new Date();
@@ -23,7 +15,7 @@ describe("TimerService.calculateElapsed", () => {
       pausedAt: null,
       accumulatedSeconds: 0,
       running: true,
-    } as any;
+    };
 
     // elapsed should be ~60 seconds (may vary by a few ms)
     const result = TimerService.calculateElapsed(state);
@@ -41,7 +33,7 @@ describe("TimerService.calculateElapsed", () => {
       pausedAt: null,
       accumulatedSeconds: 30, // 30 seconds previously paused
       running: true,
-    } as any;
+    };
 
     // elapsed = (2 min - 30s pause) = 90 seconds
     const result = TimerService.calculateElapsed(state);
@@ -56,7 +48,7 @@ describe("TimerService.calculateElapsed", () => {
       pausedAt: null,
       accumulatedSeconds: 0,
       running: false,
-    } as any;
+    };
 
     const result = TimerService.calculateElapsed(state);
     expect(result.elapsedSeconds).toBe(0);
@@ -72,7 +64,7 @@ describe("TimerService.calculateElapsed", () => {
       pausedAt: null,
       accumulatedSeconds: 0,
       running: true,
-    } as any;
+    };
 
     const result = TimerService.calculateElapsed(state);
     expect(result.isStale).toBe(true);
@@ -89,7 +81,7 @@ describe("TimerService.calculateElapsed", () => {
       pausedAt: null,
       accumulatedSeconds: 0,
       running: true,
-    } as any;
+    };
 
     const result = TimerService.calculateElapsed(state);
     expect(result.isStale).toBe(false);
@@ -107,7 +99,7 @@ describe("TimerService.calculateElapsed", () => {
       pausedAt: null,
       accumulatedSeconds: 0,
       running: true,
-    } as any;
+    };
 
     // Simulate "page refresh" — recalculate from stored timestamps only
     const result1 = TimerService.calculateElapsed(persistedState);
@@ -124,13 +116,6 @@ describe("TimerService.calculateElapsed", () => {
     // Timer started at 23:30, now at 00:30 next day
     const startTime = new Date("2024-10-18T23:30:00");
     const now = new Date("2024-10-19T00:30:00");
-
-    const state = {
-      startTime,
-      pausedAt: null,
-      accumulatedSeconds: 0,
-      running: true,
-    } as any;
 
     // The function uses Date.now() internally, so we can't exactly test cross-midnight
     // But the timestamp-based approach (epoch-based) ensures correct behavior:

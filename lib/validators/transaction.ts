@@ -24,18 +24,6 @@ export const updateTransactionSchema = createTransactionSchema.partial().extend(
   id: z.string().uuid("ID transaksi tidak valid"),
 });
 
-const queryTypeEnum = z
-  .string()
-  .optional()
-  .nullable()
-  .transform((v) => {
-    if (v === "" || v === null || v === undefined) return undefined;
-    if (Object.values(TransactionType).includes(v as TransactionType)) {
-      return v as TransactionType;
-    }
-    return undefined;
-  });
-
 const queryEnumArray = z
   .string()
   .optional()

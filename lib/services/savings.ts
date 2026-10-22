@@ -2,7 +2,6 @@
  * Savings service — manages savings goals and allocations.
  * Progress is computed deterministically from allocation amounts.
  */
-import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
 import { FinanceService } from "./finance";
 import {

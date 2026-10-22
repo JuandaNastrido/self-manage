@@ -28,6 +28,7 @@ const navItems = [
 
 export default function Navigation() {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -99,8 +100,10 @@ export default function Navigation() {
                     "Apakah Anda yakin ingin keluar? Data tidak akan hilang (lokal)."
                   )
                 ) {
-                  // No real auth to logout — just reload
-                  window.location.href = "/dashboard";
+                  // No real auth to log out of — return to the dashboard and
+                  // re-render the server components with fresh local data.
+                  router.push("/dashboard");
+                  router.refresh();
                 }
               }}
               className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"

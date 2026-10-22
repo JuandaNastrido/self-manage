@@ -1,10 +1,9 @@
 "use client";
 
-import { Clock, Play, Pause, Square, Check, X } from "lucide-react";
+import { Clock, Play, Pause, Square, X } from "lucide-react";
 import { useTimer } from "@/hooks/useTimer";
 import { formatDuration } from "@/lib/utils/ui";
 import { useState } from "react";
-import { formatCurrency } from "@/lib/utils/money";
 
 interface TaskOption {
   id: string;
@@ -111,7 +110,7 @@ export default function TaskTimerWidget({ availableTasks }: TimerWidgetProps) {
 
             <button
               onClick={async () => {
-                const secs = await stop();
+                await stop();
               }}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors"
             >

@@ -42,7 +42,7 @@ export default function BudgetsPage() {
       ]);
       setBudgets(budgetRes);
       setCategories(catRes);
-    } catch (err) {
+    } catch  {
       setError("Gagal memuat budget");
     } finally {
       setIsLoading(false);
@@ -50,7 +50,9 @@ export default function BudgetsPage() {
   }, [selectedYear, selectedMonth]);
 
   useEffect(() => {
-    fetchData();
+    (async () => {
+      await fetchData();
+    })();
   }, [fetchData]);
 
   const handleDelete = async (id: string) => {
@@ -58,7 +60,7 @@ export default function BudgetsPage() {
     try {
       await budgetsApi.delete(id);
       setBudgets((b) => b.filter((x) => x.id !== id));
-    } catch (err) {
+    } catch  {
       setError("Gagal menghapus budget");
     }
   };

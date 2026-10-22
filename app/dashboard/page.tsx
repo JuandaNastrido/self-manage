@@ -1,22 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import { DashboardService } from "@/lib/services/dashboard";
 import { formatCurrency } from "@/lib/utils/money";
-import { formatDuration, getStatusColor } from "@/lib/utils/ui";
-import { TrendingUp, TrendingDown, ReceiptText, CheckCircle, Clock, Plus, BarChart3 } from "lucide-react";
+import { TrendingUp, TrendingDown, ReceiptText, BarChart3 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import TaskTimerWidget from "@/components/TaskTimerWidget";
+import { connection } from "next/server";
 import Link from "next/link";
-
-async function getDashboardData() {
-  const summary = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ""}/api/dashboard/summary`, {
-    cache: "no-store",
-  }).then(async (r) => {
-    if (!r.ok) return null;
-    const json = await r.json();
-    return json.success ? json.data : null;
-  });
-
-  return summary;
-}
 
 // Get active tasks for timer selection
 async function getActiveTasks() {
@@ -31,20 +20,11 @@ async function getActiveTasks() {
 }
 
 export default async function DashboardPage() {
-  const summary = await getDashboardData();
-  const activeTasks = await getActiveTasks();
+  // Read live data from the local database at request time.
+  await connection();
 
-  if (!summary) {
-    return (
-      <AppLayout title="Dashboard">
-        <div className="text-center py-12">
-          <p className="text-gray-500 dark:text-gray-400">
-            Gagal memuat data dashboard
-          </p>
-        </div>
-      </AppLayout>
-    );
-  }
+  const summary = await DashboardService.getDashboardData();
+  const activeTasks = await getActiveTasks();
 
   const balanceColor = summary.balance >= 0 ? "text-green-600" : "text-red-600";
   const flowColor =
@@ -196,7 +176,7 @@ export default async function DashboardPage() {
           <div className="space-y-4">
             {summary.budgets
               .slice(0, 5)
-              .map((budget: any) => (
+              .map((budget) => (
                 <div key={budget.id}>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-gray-700 dark:text-gray-300">
@@ -250,7 +230,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
           <div className="space-y-3">
-            {summary.recentTransactions.map((tx: any) => (
+            {summary.recentTransactions.map((tx) => (
               <div
                 key={tx.id}
                 className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800 last:border-0"
@@ -304,7 +284,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
           <div className="space-y-4">
-            {summary.savingsGoals.map((goal: any) => (
+            {summary.savingsGoals.map((goal) => (
               <div key={goal.id}>
                 <div className="flex justify-between text-sm mb-1">
                   <span className="text-gray-700 dark:text-gray-300">
